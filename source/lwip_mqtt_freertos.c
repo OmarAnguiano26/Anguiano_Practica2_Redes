@@ -148,6 +148,12 @@ static ip_addr_t mqtt_addr;
 /*! @brief Indicates connection to MQTT broker. */
 static volatile bool connected = false;
 
+/*For LED config*/
+gpio_pin_config_t led_config = {kGPIO_DigitalOutput, 0};
+
+/*Holds the even*/
+EventGroupHandle_t xEventGroup;
+
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -337,6 +343,12 @@ static void app_thread(void *arg)
     struct dhcp *dhcp;
     err_t err;
     int i;
+    /**My variables for MQTT application*/
+    TickType_t xTicksToWait = 1000 / portTICK_PERIOD_MS;
+    EventBits uxBits;
+    xEventGroup = xEventGroupCreate();
+
+
 
     /* Wait for address from DHCP */
 
