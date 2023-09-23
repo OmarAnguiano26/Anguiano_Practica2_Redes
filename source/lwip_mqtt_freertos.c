@@ -64,13 +64,25 @@
 #define EXAMPLE_CLOCK_FREQ CLOCK_GetFreq(kCLOCK_CoreSysClk)
 
 /* GPIO pin configuration. */
-#define BOARD_LED_GPIO       BOARD_LED_RED_GPIO
-#define BOARD_LED_GPIO_PIN   BOARD_LED_RED_GPIO_PIN
-#define BOARD_SW_GPIO        BOARD_SW3_GPIO
-#define BOARD_SW_GPIO_PIN    BOARD_SW3_GPIO_PIN
-#define BOARD_SW_PORT        BOARD_SW3_PORT
-#define BOARD_SW_IRQ         BOARD_SW3_IRQ
-#define BOARD_SW_IRQ_HANDLER BOARD_SW3_IRQ_HANDLER
+#define BOARD_LED_R_GPIO 		BOARD_LED_RED_GPIO
+#define BOARD_LED_R_GPIO_PIN   	BOARD_LED_RED_GPIO_PIN
+#define BOARD_LED_G_GPIO       	BOARD_LED_GREEN_GPIO
+#define BOARD_LED_G_GPIO_PIN   	BOARD_LED_GREEN_GPIO_PIN
+#define BOARD_LED_B_GPIO       	BOARD_LED_BLUE_GPIO
+#define BOARD_LED_B_GPIO_PIN   	BOARD_LED_BLUE_GPIO_PIN
+
+
+#define BOARD_SW3_GPIO       	BOARD_SW3_GPIO
+#define BOARD_SW3_GPIO_PIN    	BOARD_SW3_GPIO_PIN
+#define BOARD_SW3_PORT       	BOARD_SW3_PORT
+#define BOARD_SW3_IRQ        	BOARD_SW3_IRQ
+#define BOARD_SW3_IRQ_HANDLER 	BOARD_SW3_IRQ_HANDLER
+
+#define BOARD_SW2_GPIO        	BOARD_SW2_GPIO
+#define BOARD_SW2_GPIO_PIN    	BOARD_SW2_GPIO_PIN
+#define BOARD_SW2_PORT        	BOARD_SW2_PORT
+#define BOARD_SW2_IRQ         	BOARD_SW2_IRQ
+#define BOARD_SW2_IRQ_HANDLER 	BOARD_SW2_IRQ_HANDLER
 
 
 #ifndef EXAMPLE_NETIF_INIT_FN
@@ -199,8 +211,11 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
  */
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
-    static const char *topics[] = {"omar_o2023/#", "lwip_other/#"};
-    int qos[]                   = {0, 1};
+    static const char *topics[] = {"hive/1/humidity", "hive/1/temperature", "hive/1/honey_qt",
+    							   "hive/1/sound", "hive/1/sample_rate", "hive/1/mic_sensitivity"};
+
+
+    int qos[]                   = {0, 0, 0, 0, 0, 0};
     err_t err;
     int i;
 
