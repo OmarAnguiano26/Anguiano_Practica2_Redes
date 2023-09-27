@@ -37,6 +37,7 @@
 #include "fsl_phyksz8081.h"
 #include "fsl_enet_mdio.h"
 #include "fsl_device_registers.h"
+#include "event_groups.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -71,18 +72,25 @@
 #define BOARD_LED_B_GPIO       	BOARD_LED_BLUE_GPIO
 #define BOARD_LED_B_GPIO_PIN   	BOARD_LED_BLUE_GPIO_PIN
 
+/*Event Bits*/
+#define HUM_TEMP_QUANT_EVT		( 1 << 0 )
+#define SOUND_EVT				( 1 << 1 )
+#define SAMPLE_RATE_EVT			( 1 << 2 )
+#define MIC_SENSITIVITY			( 1 << 3 )
+#define SLEEP_EVT				( 1 << 4 )
 
-#define BOARD_SW3_GPIO       	BOARD_SW3_GPIO
-#define BOARD_SW3_GPIO_PIN    	BOARD_SW3_GPIO_PIN
-#define BOARD_SW3_PORT       	BOARD_SW3_PORT
-#define BOARD_SW3_IRQ        	BOARD_SW3_IRQ
-#define BOARD_SW3_IRQ_HANDLER 	BOARD_SW3_IRQ_HANDLER
 
-#define BOARD_SW2_GPIO        	BOARD_SW2_GPIO
-#define BOARD_SW2_GPIO_PIN    	BOARD_SW2_GPIO_PIN
-#define BOARD_SW2_PORT        	BOARD_SW2_PORT
-#define BOARD_SW2_IRQ         	BOARD_SW2_IRQ
-#define BOARD_SW2_IRQ_HANDLER 	BOARD_SW2_IRQ_HANDLER
+//#define BOARD_SW3_GPIO       	BOARD_SW3_GPIO
+//#define BOARD_SW3_GPIO_PIN    	BOARD_SW3_GPIO_PIN
+//#define BOARD_SW3_PORT       	BOARD_SW3_PORT
+//#define BOARD_SW3_IRQ        	BOARD_SW3_IRQ
+//#define BOARD_SW3_IRQ_HANDLER 	BOARD_SW3_IRQ_HANDLER
+//
+//#define BOARD_SW2_GPIO        	BOARD_SW2_GPIO
+//#define BOARD_SW2_GPIO_PIN    	BOARD_SW2_GPIO_PIN
+//#define BOARD_SW2_PORT        	BOARD_SW2_PORT
+//#define BOARD_SW2_IRQ         	BOARD_SW2_IRQ
+//#define BOARD_SW2_IRQ_HANDLER 	BOARD_SW2_IRQ_HANDLER
 
 
 #ifndef EXAMPLE_NETIF_INIT_FN
@@ -113,6 +121,11 @@
  ******************************************************************************/
 
 static void connect_to_mqtt(void *ctx);
+void xtimer_sensor_callback(TimerHandle_t pxTimer);
+void xtimer_mic_callback(TimerHandle_t pxTimer);
+
+
+typedef uint16_t Myvar;
 
 /*******************************************************************************
  * Variables
@@ -153,6 +166,8 @@ gpio_pin_config_t led_config = {kGPIO_DigitalOutput, 0};
 
 /*Holds the even*/
 EventGroupHandle_t xEventGroup;
+TimerHandle_t xTimer_Sensor;
+TimerHandle_t xTimer_Mic;
 
 /*******************************************************************************
  * Code
@@ -345,9 +360,19 @@ static void app_thread(void *arg)
     int i;
     /**My variables for MQTT application*/
     TickType_t xTicksToWait = 1000 / portTICK_PERIOD_MS;
-    EventBits uxBits;
+    EventBits_t uxBits;
     xEventGroup = xEventGroupCreate();
-
+    if(xEventGroup == NULL)
+    {
+    	PRINTF("Error Creating Event Group\r\n");
+    }
+    /*Create Timer*/
+    xTimer_Sensor = xTimerCreate("TimerSensor", 5000 / portTICK_PERIOD_MS, pdTRUE, (void*)0, xtimer_sensor_callback);
+    if(xTimer_Sensor == NULL)
+    {
+    	PRINTF("Error Creating Timer\r\n");
+    }
+    xTimer_Mic = xTimerCreate("TimerMic", 7000 / portTICK_PERIOD_MS, pdTRUE, (void*)4, xtimer_mic_callback);
 
 
     /* Wait for address from DHCP */
@@ -405,21 +430,56 @@ static void app_thread(void *arg)
     }
 
     /* Publish some messages */
-    for (i = 0; i < 5;)
+    while (1)
     {
         if (connected)
         {
-            err = tcpip_callback(publish_message, NULL);
-            if (err != ERR_OK)
-            {
-                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-            }
-            i++;
+        	xTimerStart(xTimer_Sensor,0);
+        	uxBits = xEventGroupWaitBits(xEventGroup,
+        								HUM_TEMP_QUANT_EVT | SOUND_EVT | SAMPLE_RATE_EVT | MIC_SENSITIVITY | SLEEP_EVT,
+										pdTRUE,
+										pdFALSE,
+										xTicksToWait);
+
+        	if(uxBits == 0) continue; /*Returns to while*/
+
+        	if(uxBits & HUM_TEMP_QUANT_EVT)
+        	{
+        		/**Publish Temperature,Humidity and Honey Quantity*/
+        	}
+        	else if(uxBits & SOUND_EVT)
+        	{
+        		/**Publish Sound from rand function*/
+        	}
+        	else if(uxBits & SAMPLE_RATE_EVT)
+        	{
+        		/**Modifies sample rate simulated with Timer
+        		 * Use xTimerChangePeriodFromISR() */
+        	}
+        	else if(uxBits & SAMPLE_RATE_EVT)
+        	{
+        		/**Modifies Mic Sensitivity, increase the range of random number*/
+        	}
+        	else if(uxBits & SLEEP_EVT)
+        	{
+        		/**Send device to sleep, Turns ON LED
+        		 * LED ON: Device is on Sleep
+        		 * LED OFF: DEvice is working normal*/
+
+        	}
+        	else
+        	{
+        		PRINTF("Unknown Event");
+        	}
+
+
+//            err = tcpip_callback(publish_message, NULL);
+//            if (err != ERR_OK)
+//            {
+//                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+//            }
         }
-
-        sys_msleep(1000U);
     }
-
     vTaskDelete(NULL);
 }
 
@@ -518,5 +578,15 @@ int main(void)
 
     /* Will not get here unless a task calls vTaskEndScheduler ()*/
     return 0;
+}
+
+void xtimer_sensor_callback(TimerHandle_t pxTimer)
+{
+	xEventGroupSetBits(xEventGroup, HUM_TEMP_QUANT_EVT);
+}
+
+void xtimer_mic_callback(TimerHandle_t pxTimer)
+{
+	xEventGroupSetBits(xEventGroup, SOUND_EVT);
 }
 #endif
