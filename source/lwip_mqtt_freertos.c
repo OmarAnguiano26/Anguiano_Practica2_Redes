@@ -85,6 +85,12 @@
 #define HONEY_QUANTITY_RANGE	500u /**Grams*/
 #define TEMP_RANGE				100 /**Celcius*/
 
+#define SAMPLE_HIGH				1u
+#define SAMPLE_LOW				0u
+
+#define HIGH_SENSITIVITY		1u
+#define LOW_SENSITIVITY			0u
+
 
 #ifndef EXAMPLE_NETIF_INIT_FN
 /*! @brief Network interface initialization function. */
@@ -116,7 +122,12 @@
 static void connect_to_mqtt(void *ctx);
 void xtimer_sensor_callback(TimerHandle_t pxTimer);
 void xtimer_mic_callback(TimerHandle_t pxTimer);
-void generate_random_values(uint32_t sensitivity);
+void generate_random_values(void);
+void generate_mic_values(uint16_t sensitivity);
+void publish_hum(void *ctx);
+void publish_temp(void *ctx);
+void publish_honey(void *ctx);
+void publish_sound(void *ctx);
 
 /*******************************************************************************
  * Variables
@@ -162,9 +173,10 @@ TimerHandle_t 		xTimer_Mic;
 
 /**Global flags for application*/
 uint8_t 	g_ONOFF_flag = 0;
-uint32_t 	g_Mic_sensitivity_range;
-uint32_t 	g_Sample_rate;
+uint8_t 	g_Sample_rate = SAMPLE_LOW;
+uint8_t		g_mic_flag = LOW_SENSITIVITY;
 
+uint32_t 	g_Mic_sensitivity_range;
 uint16_t g_humid_val;
 uint16_t g_temp_val;
 uint16_t g_honeyq_val;
@@ -374,11 +386,8 @@ static void app_thread(void *arg)
     }
     xTimer_Mic = xTimerCreate("TimerMic", 7000 / portTICK_PERIOD_MS, pdTRUE, (void*)4, xtimer_mic_callback);
 
-
     /* Wait for address from DHCP */
-
     PRINTF("Getting IP address from DHCP...\r\n");
-
     do
     {
         if (netif_is_up(netif))
@@ -389,7 +398,6 @@ static void app_thread(void *arg)
         {
             dhcp = NULL;
         }
-
         sys_msleep(20U);
 
     } while ((dhcp == NULL) || (dhcp->state != DHCP_STATE_BOUND));
@@ -446,19 +454,60 @@ static void app_thread(void *arg)
         	if(uxBits & HUM_TEMP_QUANT_EVT)
         	{
         		/**Publish Temperature,Humidity and Honey Quantity*/
+        		generate_random_values(g_Mic_sensitivity_range);
+                err = tcpip_callback(publish_hum, NULL);
+                if (err != ERR_OK)
+                {
+                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+                }
+                err = tcpip_callback(publish_temp, NULL);
+                if (err != ERR_OK)
+                {
+                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+                }
+                err = tcpip_callback(publish_honey, NULL);
+                if (err != ERR_OK)
+                {
+                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+                }
         	}
         	else if(uxBits & SOUND_EVT)
         	{
         		/**Publish Sound from rand function*/
+        		generate_mic_values(g_Mic_sensitivity_range);
+                err = tcpip_callback(publish_sound, NULL);
+                if (err != ERR_OK)
+                {
+                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+                }
         	}
         	else if(uxBits & SAMPLE_RATE_EVT)
         	{
         		/**Modifies sample rate simulated with Timer
         		 * Use xTimerChangePeriodFromISR() */
+        		if(g_Sample_rate == SAMPLE_HIGH)
+        		{
+        			xTimerChangePeriod(xTimer_Sensor, (5000 / 2) / portTICK_PERIOD_MS, 100);
+        			xTimerChangePeriod(xTimer_Mic, (7000 / 2) / portTICK_PERIOD_MS, 100);
+        		}
+        		else
+        		{
+            		xTimerChangePeriod(xTimer_Sensor, (5000) / portTICK_PERIOD_MS, 100);
+            		xTimerChangePeriod(xTimer_Mic, (7000) / portTICK_PERIOD_MS, 100);
+        		}
+
         	}
         	else if(uxBits & MIC_SENSITIVITY)
         	{
         		/**Modifies Mic Sensitivity, increase the range of random number*/
+        		if(g_mic_flag)
+        		{
+        			g_Mic_sensitivity_range = 0xFFF; //12bit sample, less amplitude
+        		}
+        		else
+        		{
+        			g_Mic_sensitivity_range = 0xFFFF; //16bit sample, more amplitude
+        		}
         	}
         	else if(uxBits & SLEEP_EVT)
         	{
@@ -480,11 +529,7 @@ static void app_thread(void *arg)
         	}
 
 
-//            err = tcpip_callback(publish_message, NULL);
-//            if (err != ERR_OK)
-//            {
-//                PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-//            }
+
         }
     }
     vTaskDelete(NULL);
@@ -587,7 +632,7 @@ int main(void)
     return 0;
 }
 
-void generate_random_values(uint32_t sensitivity)
+void generate_random_values(void)
 {
 	srand(time(NULL)); /*Generates random number*/
 	g_humid_val = rand() % (HUMIDITY_RANGE + 1);
@@ -597,7 +642,10 @@ void generate_random_values(uint32_t sensitivity)
 
 	srand(time(NULL)); /*Generates random number*/
 	g_honeyq_val = rand() % (HONEY_QUANTITY_RANGE + 1);
+}
 
+void generate_mic_values(uint16_t sensitivity)
+{
 	srand(time(NULL)); /*Generates random number*/
 	g_sound_val =rand() % (sensitivity + 1);
 }
