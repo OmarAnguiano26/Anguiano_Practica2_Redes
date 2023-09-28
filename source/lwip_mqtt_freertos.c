@@ -125,7 +125,7 @@ void xtimer_sensor_callback(TimerHandle_t pxTimer);
 void xtimer_mic_callback(TimerHandle_t pxTimer);
 
 
-typedef uint16_t Myvar;
+
 
 /*******************************************************************************
  * Variables
@@ -165,9 +165,14 @@ static volatile bool connected = false;
 gpio_pin_config_t led_config = {kGPIO_DigitalOutput, 0};
 
 /*Holds the even*/
-EventGroupHandle_t xEventGroup;
-TimerHandle_t xTimer_Sensor;
-TimerHandle_t xTimer_Mic;
+EventGroupHandle_t 	xEventGroup;
+TimerHandle_t 		xTimer_Sensor;
+TimerHandle_t 		xTimer_Mic;
+
+/**Global flags for application*/
+uint8_t 	g_ONOFF_flag = 0;
+uint32_t 	g_Mic_sensitivity_range;
+uint32_t 	g_Sample_rate;
 
 /*******************************************************************************
  * Code
@@ -456,7 +461,7 @@ static void app_thread(void *arg)
         		/**Modifies sample rate simulated with Timer
         		 * Use xTimerChangePeriodFromISR() */
         	}
-        	else if(uxBits & SAMPLE_RATE_EVT)
+        	else if(uxBits & MIC_SENSITIVITY)
         	{
         		/**Modifies Mic Sensitivity, increase the range of random number*/
         	}
@@ -465,7 +470,14 @@ static void app_thread(void *arg)
         		/**Send device to sleep, Turns ON LED
         		 * LED ON: Device is on Sleep
         		 * LED OFF: DEvice is working normal*/
-
+        		if(g_ONOFF_flag == 0)
+        		{
+        			GPIO_PortSet(BOARD_LED_RED_GPIO, BOARD_LED_RED_PIN); /**Turns OFF LED*/
+        		}
+        		else
+        		{
+        			GPIO_PortClear(BOARD_LED_RED_GPIO, BOARD_LED_RED_PIN); /**Turns ON, Sleep mode*/
+        		}
         	}
         	else
         	{

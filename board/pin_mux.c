@@ -26,6 +26,7 @@ processor_version: 6.0.0
 #include "fsl_common.h"
 #include "fsl_port.h"
 #include "pin_mux.h"
+#include "fsl_gpio.h"
 
 /* FUNCTION ************************************************************************************************************
  *
@@ -80,6 +81,14 @@ void BOARD_InitPins(void)
     CLOCK_EnableClock(kCLOCK_PortB);
     /* Port C Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortC);
+
+    gpio_pin_config_t LED_RED_config = {
+        .pinDirection = kGPIO_DigitalOutput,
+        .outputLogic = 0U
+    };
+
+    /* Initialize GPIO functionality on pin PTB22 (pin 68)  */
+     GPIO_PinInit(BOARD_LED_RED_GPIO, BOARD_LED_RED_PIN, &LED_RED_config);
 
     /* PORTA12 (pin 42) is configured as RMII0_RXD1 */
     PORT_SetPinMux(PORTA, 12U, kPORT_MuxAlt4);
