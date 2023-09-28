@@ -454,7 +454,7 @@ static void app_thread(void *arg)
         	if(uxBits & HUM_TEMP_QUANT_EVT)
         	{
         		/**Publish Temperature,Humidity and Honey Quantity*/
-        		generate_random_values(g_Mic_sensitivity_range);
+        		generate_random_values();
                 err = tcpip_callback(publish_hum, NULL);
                 if (err != ERR_OK)
                 {
