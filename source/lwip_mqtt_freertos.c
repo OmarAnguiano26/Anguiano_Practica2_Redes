@@ -38,6 +38,8 @@
 #include "fsl_enet_mdio.h"
 #include "fsl_device_registers.h"
 #include "event_groups.h"
+#include <time.h> /* Function for  srand */
+
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -79,18 +81,9 @@
 #define MIC_SENSITIVITY			( 1 << 3 )
 #define SLEEP_EVT				( 1 << 4 )
 
-
-//#define BOARD_SW3_GPIO       	BOARD_SW3_GPIO
-//#define BOARD_SW3_GPIO_PIN    	BOARD_SW3_GPIO_PIN
-//#define BOARD_SW3_PORT       	BOARD_SW3_PORT
-//#define BOARD_SW3_IRQ        	BOARD_SW3_IRQ
-//#define BOARD_SW3_IRQ_HANDLER 	BOARD_SW3_IRQ_HANDLER
-//
-//#define BOARD_SW2_GPIO        	BOARD_SW2_GPIO
-//#define BOARD_SW2_GPIO_PIN    	BOARD_SW2_GPIO_PIN
-//#define BOARD_SW2_PORT        	BOARD_SW2_PORT
-//#define BOARD_SW2_IRQ         	BOARD_SW2_IRQ
-//#define BOARD_SW2_IRQ_HANDLER 	BOARD_SW2_IRQ_HANDLER
+#define HUMIDITY_RANGE			100u /**Porcentage*/
+#define HONEY_QUANTITY_RANGE	500u /**Grams*/
+#define TEMP_RANGE				100 /**Celcius*/
 
 
 #ifndef EXAMPLE_NETIF_INIT_FN
@@ -123,9 +116,7 @@
 static void connect_to_mqtt(void *ctx);
 void xtimer_sensor_callback(TimerHandle_t pxTimer);
 void xtimer_mic_callback(TimerHandle_t pxTimer);
-
-
-
+void generate_random_values(uint32_t sensitivity);
 
 /*******************************************************************************
  * Variables
@@ -174,6 +165,10 @@ uint8_t 	g_ONOFF_flag = 0;
 uint32_t 	g_Mic_sensitivity_range;
 uint32_t 	g_Sample_rate;
 
+uint16_t g_humid_val;
+uint16_t g_temp_val;
+uint16_t g_honeyq_val;
+uint16_t g_sound_val;
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -590,6 +585,74 @@ int main(void)
 
     /* Will not get here unless a task calls vTaskEndScheduler ()*/
     return 0;
+}
+
+void generate_random_values(uint32_t sensitivity)
+{
+	srand(time(NULL)); /*Generates random number*/
+	g_humid_val = rand() % (HUMIDITY_RANGE + 1);
+
+	srand(time(NULL)); /*Generates random number*/
+	g_temp_val = rand() % (TEMP_RANGE + 1);
+
+	srand(time(NULL)); /*Generates random number*/
+	g_honeyq_val = rand() % (HONEY_QUANTITY_RANGE + 1);
+
+	srand(time(NULL)); /*Generates random number*/
+	g_sound_val =rand() % (sensitivity + 1);
+}
+
+/**Functions to publish*/
+void publish_hum(void *ctx)
+{
+    static const char *topic   = "omar_o2023/100";//TODO
+    static char message[16];
+
+    LWIP_UNUSED_ARG(ctx);
+    memset(message,0,16);
+    sprintf(message,"%d",g_humid_val);
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+void publish_temp(void *ctx)
+{
+    static const char *topic   = "omar_o2023/100";//TODO
+    static char message[16];
+
+    LWIP_UNUSED_ARG(ctx);
+    memset(message,0,16);
+    sprintf(message,"%d",g_temp_val);
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+void publish_honey(void *ctx)
+{
+    static const char *topic   = "omar_o2023/100";//TODO
+    static char message[16];
+
+    LWIP_UNUSED_ARG(ctx);
+    memset(message,0,16);
+    sprintf(message,"%d",g_honeyq_val);
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
+}
+
+void publish_sound(void *ctx)
+{
+    static const char *topic   = "omar_o2023/100";//TODO
+    static char message[16];
+
+    LWIP_UNUSED_ARG(ctx);
+    memset(message,0,16);
+    sprintf(message,"%d",g_sound_val);
+
+    PRINTF("Going to publish to the topic \"%s\"...\r\n", topic);
+    mqtt_publish(mqtt_client, topic, message, strlen(message), 1, 0, mqtt_message_published_cb, (void *)topic);
 }
 
 void xtimer_sensor_callback(TimerHandle_t pxTimer)
