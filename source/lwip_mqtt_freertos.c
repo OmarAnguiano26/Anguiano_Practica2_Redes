@@ -91,6 +91,9 @@
 #define HIGH_SENSITIVITY		1u
 #define LOW_SENSITIVITY			0u
 
+#define SLEEP					1u
+#define WAKE					0u
+
 
 #ifndef EXAMPLE_NETIF_INIT_FN
 /*! @brief Network interface initialization function. */
@@ -232,6 +235,37 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
             PRINTF("\\x%02x", data[i]);
         }
     }
+    /**Here we set the flash according to what we received*/
+    if(!memcmp(data,"SLEEP",5))/**Sends device to sleep*/
+    {
+    	g_ONOFF_flag == SLEEP;
+    	xEventGroupSetBits(xEventGroup, SLEEP_EVT);
+    }
+    else if(!memcmp(data,"WAKE",4))/**Wakes device*/
+    {
+    	g_ONOFF_flag == WAKE;
+    	xEventGroupSetBits(xEventGroup, SLEEP_EVT);
+    }
+    else if(!memcmp(data,"HIGH",4)) /**Sample Rate high*/
+    {
+    	g_Sample_rate == SAMPLE_HIGH;
+    	xEventGroupSetBits(xEventGroup, SAMPLE_RATE_EVT);
+    }
+    else if(!memcmp(data,"LOW",3)) /**Sample Rate low*/
+    {
+    	g_Sample_rate == SAMPLE_LOW;
+    	xEventGroupSetBits(xEventGroup, SAMPLE_RATE_EVT);
+    }
+    else if(!memcmp(data,"HIGH_SENSE",10)) /**High Sensitivity*/
+    {
+    	g_mic_flag == HIGH_SENSITIVITY;
+    	xEventGroupSetBits(xEventGroup, MIC_SENSITIVITY);
+    }
+    else if(!memcmp(data,"LOW_SENSE",9)) /**Low Sensitivity*/
+    {
+    	g_mic_flag == LOW_SENSITIVITY;
+    	xEventGroupSetBits(xEventGroup, MIC_SENSITIVITY);
+    }
 
     if (flags & MQTT_DATA_FLAG_LAST)
     {
@@ -245,10 +279,10 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
     static const char *topics[] = {"hive/1/humidity", "hive/1/temperature", "hive/1/honey_qt",
-    							   "hive/1/sound", "hive/1/sample_rate", "hive/1/mic_sensitivity"};
+    							   "hive/1/sound",};
 
 
-    int qos[]                   = {0, 0, 0, 0, 0, 0};
+    int qos[]                   = {0, 0, 0, 0};
     err_t err;
     int i;
 
@@ -436,7 +470,6 @@ static void app_thread(void *arg)
     {
         PRINTF("Failed to obtain IP address: %d.\r\n", err);
     }
-
     /* Publish some messages */
     while (1)
     {
@@ -500,7 +533,7 @@ static void app_thread(void *arg)
         	else if(uxBits & MIC_SENSITIVITY)
         	{
         		/**Modifies Mic Sensitivity, increase the range of random number*/
-        		if(g_mic_flag)
+        		if(g_mic_flag == HIGH_SENSITIVITY)
         		{
         			g_Mic_sensitivity_range = 0xFFF; //12bit sample, less amplitude
         		}
@@ -514,13 +547,13 @@ static void app_thread(void *arg)
         		/**Send device to sleep, Turns ON LED
         		 * LED ON: Device is on Sleep
         		 * LED OFF: DEvice is working normal*/
-        		if(g_ONOFF_flag == 0)
+        		if(g_ONOFF_flag == WAKE)
         		{
-        			GPIO_PortSet(BOARD_LED_RED_GPIO, BOARD_LED_RED_PIN); /**Turns OFF LED*/
+        			GPIO_PortSet(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN); /**Turns OFF LED*/
         		}
         		else
         		{
-        			GPIO_PortClear(BOARD_LED_RED_GPIO, BOARD_LED_RED_PIN); /**Turns ON, Sleep mode*/
+        			GPIO_PortClear(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN); /**Turns ON, Sleep mode*/
         		}
         	}
         	else
@@ -566,6 +599,10 @@ static void stack_init(void *arg)
         .phyHandle  = &phyHandle,
         .macAddress = configMAC_ADDR,
     };
+
+    GPIO_PortToggle(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
+
+    GPIO_PortToggle(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
 
     LWIP_UNUSED_ARG(arg);
     generate_client_id();
@@ -620,6 +657,19 @@ int main(void)
     /* Disable SYSMPU. */
     base->CESR &= ~SYSMPU_CESR_VLD_MASK;
 
+    gpio_pin_config_t LED_RED_config = {
+        .pinDirection = kGPIO_DigitalOutput,
+        .outputLogic = 1U
+    };
+
+    GPIO_PinInit(BOARD_LED_RED_GPIO, BOARD_INITPINS_LED_RED_PIN, &LED_RED_config);
+
+    PRINTF("TURN OFF LED\r\n");
+    GPIO_PortSet(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
+
+    GPIO_PortClear(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
+
+
     /* Initialize lwIP from thread */
     if (sys_thread_new("main", stack_init, NULL, INIT_THREAD_STACKSIZE, INIT_THREAD_PRIO) == NULL)
     {
@@ -653,7 +703,7 @@ void generate_mic_values(uint16_t sensitivity)
 /**Functions to publish*/
 void publish_hum(void *ctx)
 {
-    static const char *topic   = "omar_o2023/100";//TODO
+    static const char *topic   = "hive/1/humidity";
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
@@ -666,7 +716,7 @@ void publish_hum(void *ctx)
 
 void publish_temp(void *ctx)
 {
-    static const char *topic   = "omar_o2023/100";//TODO
+    static const char *topic   = "hive/1/temperature";
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
@@ -679,7 +729,7 @@ void publish_temp(void *ctx)
 
 void publish_honey(void *ctx)
 {
-    static const char *topic   = "omar_o2023/100";//TODO
+    static const char *topic   = "hive/1/honey_qt";//TODO
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
@@ -692,7 +742,7 @@ void publish_honey(void *ctx)
 
 void publish_sound(void *ctx)
 {
-    static const char *topic   = "omar_o2023/100";//TODO
+    static const char *topic   = "hive/1/sound";//TODO
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
