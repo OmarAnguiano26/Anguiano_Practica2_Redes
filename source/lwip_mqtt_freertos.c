@@ -240,32 +240,32 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
     /**Here we set the flash according to what we received*/
     if(!memcmp(data,"SLEEP",5))/**Sends device to sleep*/
     {
-    	g_ONOFF_flag == SLEEP;
+    	g_ONOFF_flag = SLEEP;
     	xEventGroupSetBits(xEventGroup, SLEEP_EVT);
     }
     else if(!memcmp(data,"WAKE",4))/**Wakes device*/
     {
-    	g_ONOFF_flag == WAKE;
+    	g_ONOFF_flag = WAKE;
     	xEventGroupSetBits(xEventGroup, SLEEP_EVT);
     }
     else if(!memcmp(data,"HIGH",4)) /**Sample Rate high*/
     {
-    	g_Sample_rate == SAMPLE_HIGH;
+    	g_Sample_rate = SAMPLE_HIGH;
     	xEventGroupSetBits(xEventGroup, SAMPLE_RATE_EVT);
     }
     else if(!memcmp(data,"LOW",3)) /**Sample Rate low*/
     {
-    	g_Sample_rate == SAMPLE_LOW;
+    	g_Sample_rate = SAMPLE_LOW;
     	xEventGroupSetBits(xEventGroup, SAMPLE_RATE_EVT);
     }
     else if(!memcmp(data,"HIGH_SENSE",10)) /**High Sensitivity*/
     {
-    	g_mic_flag == HIGH_SENSITIVITY;
+    	g_mic_flag = HIGH_SENSITIVITY;
     	xEventGroupSetBits(xEventGroup, MIC_SENSITIVITY);
     }
     else if(!memcmp(data,"LOW_SENSE",9)) /**Low Sensitivity*/
     {
-    	g_mic_flag == LOW_SENSITIVITY;
+    	g_mic_flag = LOW_SENSITIVITY;
     	xEventGroupSetBits(xEventGroup, MIC_SENSITIVITY);
     }
 
@@ -474,11 +474,10 @@ static void app_thread(void *arg)
     }
     srand((unsigned) time(&t));
     xTimerStart(xTimer_Sensor,0);
+    xTimerStart(xTimer_Mic,0);
     /* Publish some messages */
     while (1)
     {
-        //if (connected)
-        //{
         	uxBits = xEventGroupWaitBits(xEventGroup,
         								HUM_TEMP_QUANT_EVT | SOUND_EVT | SAMPLE_RATE_EVT | MIC_SENSITIVITY | SLEEP_EVT,
 										pdTRUE,
@@ -489,33 +488,39 @@ static void app_thread(void *arg)
 
         	if(uxBits & HUM_TEMP_QUANT_EVT)
         	{
-        		/**Publish Temperature,Humidity and Honey Quantity*/
-        		generate_random_values();
-                err = tcpip_callback(publish_hum, NULL);
-                if (err != ERR_OK)
-                {
+        		if(g_ONOFF_flag == WAKE)
+        		{
+        			/**Publish Temperature,Humidity and Honey Quantity*/
+        			generate_random_values();
+        			err = tcpip_callback(publish_hum, NULL);
+        			if (err != ERR_OK)
+        			{
+        				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+        			}
+        			err = tcpip_callback(publish_temp, NULL);
+        			if (err != ERR_OK)
+        			{
+        				PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+        			}
+        			err = tcpip_callback(publish_honey, NULL);
+        			if (err != ERR_OK)
+        			{
                     PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-                }
-                err = tcpip_callback(publish_temp, NULL);
-                if (err != ERR_OK)
-                {
-                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-                }
-                err = tcpip_callback(publish_honey, NULL);
-                if (err != ERR_OK)
-                {
-                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-                }
+        			}
+        		}
         	}
         	else if(uxBits & SOUND_EVT)
         	{
-        		/**Publish Sound from rand function*/
-        		generate_mic_values(g_Mic_sensitivity_range);
-                err = tcpip_callback(publish_sound, NULL);
-                if (err != ERR_OK)
-                {
-                    PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
-                }
+        		if(g_ONOFF_flag == WAKE)
+        		{
+        			/**Publish Sound from rand function*/
+        			generate_mic_values(g_Mic_sensitivity_range);
+                	err = tcpip_callback(publish_sound, NULL);
+                	if (err != ERR_OK)
+                	{
+                    	PRINTF("Failed to invoke publishing of a message on the tcpip_thread: %d.\r\n", err);
+                	}
+        		}
         	}
         	else if(uxBits & SAMPLE_RATE_EVT)
         	{
@@ -563,10 +568,7 @@ static void app_thread(void *arg)
         	{
         		PRINTF("Unknown Event");
         	}
-
-
-
-        //}
+        //
     }
     vTaskDelete(NULL);
 }
@@ -686,13 +688,10 @@ int main(void)
 
 void generate_random_values(void)
 {
-	//srand(time(NULL)); /*Generates random number*/
 	g_humid_val = rand() % (HUMIDITY_RANGE + 1);
 
-	//srand(time(NULL)); /*Generates random number*/
 	g_temp_val = rand() % (TEMP_RANGE + 1);
 
-	//srand(time(NULL)); /*Generates random number*/
 	g_honeyq_val = rand() % (HONEY_QUANTITY_RANGE + 1);
 }
 
