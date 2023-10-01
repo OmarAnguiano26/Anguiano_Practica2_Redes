@@ -184,6 +184,8 @@ uint16_t g_humid_val;
 uint16_t g_temp_val;
 uint16_t g_honeyq_val;
 uint16_t g_sound_val;
+
+time_t t;
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -279,10 +281,10 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
 static void mqtt_subscribe_topics(mqtt_client_t *client)
 {
     static const char *topics[] = {"hive/1/humidity", "hive/1/temperature", "hive/1/honey_qt",
-    							   "hive/1/sound",};
+    							   "hive/1/text","hive/1/sound"};
 
 
-    int qos[]                   = {0, 0, 0, 0};
+    int qos[]                   = {0, 0, 0, 0, 0};
     err_t err;
     int i;
 
@@ -470,12 +472,13 @@ static void app_thread(void *arg)
     {
         PRINTF("Failed to obtain IP address: %d.\r\n", err);
     }
+    srand((unsigned) time(&t));
+    xTimerStart(xTimer_Sensor,0);
     /* Publish some messages */
     while (1)
     {
-        if (connected)
-        {
-        	xTimerStart(xTimer_Sensor,0);
+        //if (connected)
+        //{
         	uxBits = xEventGroupWaitBits(xEventGroup,
         								HUM_TEMP_QUANT_EVT | SOUND_EVT | SAMPLE_RATE_EVT | MIC_SENSITIVITY | SLEEP_EVT,
 										pdTRUE,
@@ -563,7 +566,7 @@ static void app_thread(void *arg)
 
 
 
-        }
+        //}
     }
     vTaskDelete(NULL);
 }
@@ -665,9 +668,8 @@ int main(void)
     GPIO_PinInit(BOARD_LED_RED_GPIO, BOARD_INITPINS_LED_RED_PIN, &LED_RED_config);
 
     PRINTF("TURN OFF LED\r\n");
-    GPIO_PortSet(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
-
     GPIO_PortClear(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
+    GPIO_PortSet(BOARD_LED_RED_GPIO, 1u << BOARD_INITPINS_LED_RED_PIN);
 
 
     /* Initialize lwIP from thread */
@@ -684,13 +686,13 @@ int main(void)
 
 void generate_random_values(void)
 {
-	srand(time(NULL)); /*Generates random number*/
+	//srand(time(NULL)); /*Generates random number*/
 	g_humid_val = rand() % (HUMIDITY_RANGE + 1);
 
-	srand(time(NULL)); /*Generates random number*/
+	//srand(time(NULL)); /*Generates random number*/
 	g_temp_val = rand() % (TEMP_RANGE + 1);
 
-	srand(time(NULL)); /*Generates random number*/
+	//srand(time(NULL)); /*Generates random number*/
 	g_honeyq_val = rand() % (HONEY_QUANTITY_RANGE + 1);
 }
 
@@ -729,7 +731,7 @@ void publish_temp(void *ctx)
 
 void publish_honey(void *ctx)
 {
-    static const char *topic   = "hive/1/honey_qt";//TODO
+    static const char *topic   = "hive/1/honey_qt";
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
@@ -742,7 +744,7 @@ void publish_honey(void *ctx)
 
 void publish_sound(void *ctx)
 {
-    static const char *topic   = "hive/1/sound";//TODO
+    static const char *topic  = "hive/1/sound";
     static char message[16];
 
     LWIP_UNUSED_ARG(ctx);
